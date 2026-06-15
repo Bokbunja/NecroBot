@@ -13,6 +13,45 @@ repo, calling out the specific files and dependencies that block the port.
 
 ---
 
+## ✅ STATUS: the stub build is implemented and verified
+
+Both projects are now **SDK-style, target `net8.0`, build with 0 errors, and run
+end-to-end** against a fake client. The reverse-engineered `FeroxRev` submodule
+and the `POGOProtos` protobufs are replaced by hand-written stand-ins under
+`PoGo.NecroBot.Logic/Stubs/` (`PoGoProtos.cs`, `RocketApi.cs`, `GeoCoordinate.cs`).
+The fake `PokemonGo.RocketAPI.Client` returns canned, self-consistent data so the
+full loop exercises real code paths.
+
+### Build & run
+
+```bash
+dotnet build NecroBot.sln
+dotnet run --project PoGo.NecroBot.CLI      # Ctrl+C to stop gracefully
+```
+
+Expected: version check → login (`Playing as StubTrainer`) → display best Pokémon
+→ recycle → walk to a stub Pokéstop → catch Pokémon while walking → spin the stop
+→ transfer duplicates → loop. Ctrl+C prints `Bot stopped.` and exits 0.
+
+### What the stub step replaced (matches §1 / §3 below)
+
+- `System.Windows.Forms` clipboard → removed (`Program.LoginWithGoogle` prints only).
+- `System.Device.Location.GeoCoordinate` → `Stubs/GeoCoordinate.cs` (Haversine).
+- `SuperSocket` WebSocket → `WebSocketInterface` is a no-op stub.
+- `log4net` / `App.config` / `packages.config` → removed; console logging only.
+- `ConsoleLogger` now uses UTF-8 and tolerates redirected stdout.
+- The game API + protos → `Stubs/RocketApi.cs` + `Stubs/PoGoProtos.cs`.
+
+### Remaining (optional) polish
+
+- Windows-style `\\config\\…` / `\\Logs\\…` paths still work on Linux but create
+  backslash-in-name files; switch to `Path.Combine` for clean cross-platform output.
+- Replace the obsolete `WebClient` in `VersionCheckState` with `HttpClient`.
+- Add an xUnit project around the catch/transfer/evolve decision logic (now easy
+  against the stub client).
+
+---
+
 ## 0. Current state (what you're starting from)
 
 | Project | Target | Output |

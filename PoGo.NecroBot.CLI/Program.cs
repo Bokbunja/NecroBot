@@ -1,9 +1,6 @@
-﻿#region using directives
+#region using directives
 
 using System;
-using System.Diagnostics;
-using System.Threading;
-using System.Windows.Forms;
 using PoGo.NecroBot.Logic;
 using PoGo.NecroBot.Logic.Logging;
 using PoGo.NecroBot.Logic.State;
@@ -15,23 +12,12 @@ namespace PoGo.NecroBot.CLI
 {
     internal class Program
     {
+        // Cross-platform: just print the Google device code + URL. (The original copied the
+        // code to the Windows clipboard and launched a browser; neither is portable, and the
+        // stub client never triggers Google device-code auth anyway.)
         public static void LoginWithGoogle(string usercode, string uri)
         {
-            try
-            {
-                Logger.Write("Google Device Code copied to clipboard");
-                Thread.Sleep(2000);
-                Process.Start(uri);
-                var thread = new Thread(() => Clipboard.SetText(usercode)); //Copy device code
-                thread.SetApartmentState(ApartmentState.STA); //Set the thread to STA
-                thread.Start();
-                thread.Join();
-            }
-            catch (Exception)
-            {
-                Logger.Write("Couldnt copy to clipboard, do it manually", LogLevel.Error);
-                Logger.Write($"Goto: {uri} & enter {usercode}", LogLevel.Error);
-            }
+            Logger.Write($"Google login required - go to: {uri} and enter code: {usercode}", LogLevel.Warning);
         }
 
         private static void Main()
@@ -42,7 +28,11 @@ namespace PoGo.NecroBot.CLI
 
             var machine = new StateMachine();
             var stats = new Statistics();
-            stats.DirtyEvent += () => Console.Title = stats.ToString();
+            stats.DirtyEvent += () =>
+            {
+                try { Console.Title = stats.ToString(); }
+                catch { /* Console.Title is a no-op / throws when output is redirected */ }
+            };
 
             var aggregator = new StatisticsAggregator(stats);
             var listener = new ConsoleEventListener();
@@ -57,7 +47,6 @@ namespace PoGo.NecroBot.CLI
             }
 
             machine.SetFailureState(new LoginState());
-
 
             var context = new Context(new ClientSettings(settings), new LogicSettings(settings));
             context.Client.Login.GoogleDeviceCodeEvent += LoginWithGoogle;
