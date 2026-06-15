@@ -2,6 +2,7 @@
 
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using PoGo.NecroBot.Logic.Event;
 using PoGo.NecroBot.Logic.Utils;
 
@@ -11,12 +12,13 @@ namespace PoGo.NecroBot.Logic.State
 {
     public class PositionCheckState : IState
     {
-        public IState Execute(Context ctx, StateMachine machine)
+        // Purely local file/coordinate checks; nothing to await.
+        public Task<IState> Execute(Context ctx, StateMachine machine)
         {
-            var coordsPath = Directory.GetCurrentDirectory() + "\\Configs\\Coords.ini";
+            var coordsPath = Path.Combine(Directory.GetCurrentDirectory(), "Configs", "Coords.ini");
             if (File.Exists(coordsPath))
             {
-                var latLngFromFile = LoadPositionFromDisk(machine);
+                var latLngFromFile = LoadPositionFromDisk(coordsPath, machine);
                 if (latLngFromFile != null)
                 {
                     var distance = LocationUtils.CalculateDistanceInMeters(latLngFromFile.Item1, latLngFromFile.Item2,
@@ -58,15 +60,15 @@ namespace PoGo.NecroBot.Logic.State
 
             machine.RequestDelay(3000);
 
-            return new FarmState();
+            return Task.FromResult<IState>(new FarmState());
         }
 
-        private static Tuple<double, double> LoadPositionFromDisk(StateMachine machine)
+        private static Tuple<double, double> LoadPositionFromDisk(string coordsPath, StateMachine machine)
         {
-            if (File.Exists(Directory.GetCurrentDirectory() + "\\Configs\\Coords.ini") &&
-                File.ReadAllText(Directory.GetCurrentDirectory() + "\\Configs\\Coords.ini").Contains(":"))
+            if (File.Exists(coordsPath) &&
+                File.ReadAllText(coordsPath).Contains(":"))
             {
-                var latlngFromFile = File.ReadAllText(Directory.GetCurrentDirectory() + "\\Configs\\Coords.ini");
+                var latlngFromFile = File.ReadAllText(coordsPath);
                 var latlng = latlngFromFile.Split(':');
                 if (latlng[0].Length != 0 && latlng[1].Length != 0)
                 {

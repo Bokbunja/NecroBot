@@ -14,14 +14,13 @@ namespace PoGo.NecroBot.Logic.Logging
         private static void Log(string message)
         {
             // maybe do a new log rather than appending?
-            Directory.CreateDirectory(Directory.GetCurrentDirectory() + "\\Logs");
+            var logDir = Path.Combine(Directory.GetCurrentDirectory(), "Logs");
+            Directory.CreateDirectory(logDir);
 
+            var logFile = Path.Combine(logDir,
+                $"NecroBot-{DateTime.Today.ToString("yyyy-MM-dd")}-{DateTime.Now.ToString("HH")}.txt");
 
-            using (
-                var log =
-                    File.AppendText(Directory.GetCurrentDirectory() +
-                                    $"\\Logs\\NecroBot-{DateTime.Today.ToString("yyyy-MM-dd")}-{DateTime.Now.ToString("HH")}.txt")
-                )
+            using (var log = File.AppendText(logFile))
             {
                 log.WriteLine(message);
                 log.Flush();

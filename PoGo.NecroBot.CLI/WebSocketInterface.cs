@@ -1,66 +1,26 @@
-﻿using Newtonsoft.Json;
 using PoGo.NecroBot.Logic.Event;
 using PoGo.NecroBot.Logic.State;
-using SuperSocket.SocketBase;
-using SuperSocket.WebSocket;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace PoGo.NecroBot.CLI
 {
+    /// <summary>
+    ///     No-op stand-in for the original SuperSocket-based WebSocket server (SuperSocket is a
+    ///     Windows/.NET-Framework dependency). The hook is preserved so the event wiring in
+    ///     Program.cs still compiles; broadcasting can be reimplemented on System.Net.WebSockets
+    ///     when needed. Disabled by default (GlobalSettings.EnableWebSocket = false).
+    /// </summary>
     public class WebSocketInterface
     {
-        private WebSocketServer _server;
-
         public WebSocketInterface(int port)
         {
-            _server = new WebSocketServer();
-            if(_server.Setup(port) == false)
-            {
-                Logic.Logging.Logger.Write($"Failed to start WebSocketServer on port : {port}", Logic.Logging.LogLevel.Error);
-                return;
-            }
-
-            _server.NewMessageReceived += HandleMessage;
-            _server.NewSessionConnected += HandleSession;
-
-            _server.Start();
-        }
-
-        private void HandleMessage(WebSocketSession session, string message)
-        {
-
-        }
-
-        private void HandleSession(WebSocketSession session)
-        {
-        }
-
-        private void Broadcast(string message)
-        {
-            foreach(var session in _server.GetAllSessions())
-            {
-                try
-                {
-                    session.Send(message);
-                }
-                catch { }
-            }
+            Logic.Logging.Logger.Write(
+                $"WebSocket interface is stubbed out in this .NET 8 build (requested port {port}).",
+                Logic.Logging.LogLevel.Warning);
         }
 
         public void Listen(IEvent evt, Context ctx)
         {
-            dynamic eve = evt;
-
-            var jsonSerializerSettings = new JsonSerializerSettings()
-            {
-                TypeNameHandling = TypeNameHandling.All
-            };
-
-            Broadcast(JsonConvert.SerializeObject(eve, Formatting.None, jsonSerializerSettings));
+            // Intentionally empty - no clients to broadcast to in the stub build.
         }
     }
 }

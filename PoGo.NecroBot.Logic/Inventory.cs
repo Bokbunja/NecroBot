@@ -82,11 +82,16 @@ namespace PoGo.NecroBot.Logic
 
                 foreach (var pokemon in pokemonsThatCanBeTransfered)
                 {
-                    var settings = pokemonSettings.Single(x => x.PokemonId == pokemon.Key);
-                    var familyCandy = pokemonFamilies.Single(x => settings.FamilyId == x.FamilyId);
+                    // A PokemonId may not have a matching settings entry (cache gaps, new species);
+                    // skip it rather than throwing and aborting the whole transfer pass.
+                    var settings = pokemonSettings.FirstOrDefault(x => x.PokemonId == pokemon.Key);
+                    if (settings == null)
+                        continue;
+
+                    var familyCandy = pokemonFamilies.FirstOrDefault(x => settings.FamilyId == x.FamilyId);
                     var amountToSkip = _logicClient.Settings.KeepMinDuplicatePokemon;
 
-                    if (settings.CandyToEvolve > 0)
+                    if (familyCandy != null && settings.CandyToEvolve > 0)
                     {
                         var amountPossible = familyCandy.Candy / settings.CandyToEvolve;
                         if (amountPossible > amountToSkip)
@@ -193,7 +198,7 @@ namespace PoGo.NecroBot.Logic
                         new ItemData
                         {
                             ItemId = x.ItemId,
-                            Count = x.Count - _logicClient.Settings.ItemRecycleFilter.Single(f => f.Key == x.ItemId).Value,
+                            Count = x.Count - _logicClient.Settings.ItemRecycleFilter.First(f => f.Key == x.ItemId).Value,
                             Unseen = x.Unseen
                         });
         }
@@ -260,8 +265,14 @@ namespace PoGo.NecroBot.Logic
             var pokemonToEvolve = new List<PokemonData>();
             foreach (var pokemon in pokemons)
             {
-                var settings = pokemonSettings.Single(x => x.PokemonId == pokemon.PokemonId);
-                var familyCandy = pokemonFamilies.Single(x => settings.FamilyId == x.FamilyId);
+                // Guard against missing settings/family entries instead of throwing.
+                var settings = pokemonSettings.FirstOrDefault(x => x.PokemonId == pokemon.PokemonId);
+                if (settings == null)
+                    continue;
+
+                var familyCandy = pokemonFamilies.FirstOrDefault(x => settings.FamilyId == x.FamilyId);
+                if (familyCandy == null)
+                    continue;
 
                 //Don't evolve if we can't evolve it
                 if (settings.EvolutionIds.Count == 0)
@@ -269,7 +280,8 @@ namespace PoGo.NecroBot.Logic
 
                 var pokemonCandyNeededAlready =
                     pokemonToEvolve.Count(
-                        p => pokemonSettings.Single(x => x.PokemonId == p.PokemonId).FamilyId == settings.FamilyId)*
+                        p => pokemonSettings.FirstOrDefault(x => x.PokemonId == p.PokemonId)?.FamilyId ==
+                             settings.FamilyId)*
                     settings.CandyToEvolve;
 
                 if (_logicClient.Settings.EvolveAllPokemonAboveIv)

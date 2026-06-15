@@ -8,22 +8,21 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace PoGo.NecroBot.Logic.Tasks
 {
     public static class LogBestPokemonTask
     {
-        public static void Execute(Context ctx, StateMachine machine)
+        public static async Task Execute(Context ctx, StateMachine machine)
         {
-            var highestsPokemonCp = ctx.Inventory.GetHighestsCp(ctx.LogicSettings.AmountOfPokemonToDisplayOnStart).Result;
+            var highestsPokemonCp = await ctx.Inventory.GetHighestsCp(ctx.LogicSettings.AmountOfPokemonToDisplayOnStart);
             List<Tuple<PokemonData, int, double,double>> pokemonPairedWithStatsCP = new List<Tuple<PokemonData, int, double,double>>() ;
            
             foreach (var pokemon in highestsPokemonCp)
                 pokemonPairedWithStatsCP.Add( Tuple.Create(pokemon, PokemonInfo.CalculateMaxCp(pokemon), PokemonInfo.CalculatePokemonPerfection(pokemon), PokemonInfo.GetLevel(pokemon)));
 
-            var highestsPokemonPerfect = ctx.Inventory.GetHighestsPerfect(ctx.LogicSettings.AmountOfPokemonToDisplayOnStart).Result;
+            var highestsPokemonPerfect = await ctx.Inventory.GetHighestsPerfect(ctx.LogicSettings.AmountOfPokemonToDisplayOnStart);
 
             List<Tuple<PokemonData, int, double, double>> pokemonPairedWithStatsIV = new List<Tuple<PokemonData, int, double, double>>();
             foreach (var pokemon in highestsPokemonPerfect)
@@ -36,7 +35,7 @@ namespace PoGo.NecroBot.Logic.Tasks
                         PokemonList = pokemonPairedWithStatsCP
                     });
  
-                Thread.Sleep(500);
+                await Task.Delay(500, machine.CancellationToken);
      
 
                 machine.Fire(
@@ -46,7 +45,7 @@ namespace PoGo.NecroBot.Logic.Tasks
                            PokemonList = pokemonPairedWithStatsIV
                        });
  
-                Thread.Sleep(500);
+                await Task.Delay(500, machine.CancellationToken);
     
 
         }

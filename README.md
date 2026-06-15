@@ -10,6 +10,21 @@ Chatting about this Repository can be done on our Discord: https://discord.gg/Vs
 The NecroBot Website can be found at <a href="http://necrobot.net">necrobot.net</a>
 <br/>
 
+<h2>Modernized .NET 8 build (runs against a simulated client)</h2>
+
+This branch has been ported from the original Windows-only .NET Framework 4.5
+projects to cross-platform <strong>.NET 8</strong>. The reverse-engineered game
+API is replaced by a fake client (<code>PoGo.NecroBot.Logic/Stubs/</code>) so the
+bot <strong>builds and runs end-to-end on any OS</strong> for learning/development:
+
+<pre>
+dotnet build NecroBot.sln
+dotnet run --project PoGo.NecroBot.CLI   # Ctrl+C to stop gracefully
+</pre>
+
+It does <strong>not</strong> connect to live Pokémon GO (that protocol/auth is long
+obsolete). See <code>docs/MODERNIZATION.md</code> for details and the porting plan.
+
 <h2><a name="features">Features</a></h2>
 
  - [PTC Login / Google]

@@ -1,8 +1,9 @@
-﻿#region using directives
+#region using directives
 
-using System.Threading;
+using System.Threading.Tasks;
 using PoGo.NecroBot.Logic.Event;
 using PoGo.NecroBot.Logic.State;
+using PoGo.NecroBot.Logic.Utils;
 
 #endregion
 
@@ -10,20 +11,21 @@ namespace PoGo.NecroBot.Logic.Tasks
 {
     public class RecycleItemsTask
     {
-        public static void Execute(Context ctx, StateMachine machine)
+        public static async Task Execute(Context ctx, StateMachine machine)
         {
-            var items = ctx.Inventory.GetItemsToRecycle(ctx.Settings).Result;
+            var items = await ctx.Inventory.GetItemsToRecycle(ctx.Settings);
 
             foreach (var item in items)
             {
-                ctx.Client.Inventory.RecycleItem(item.ItemId, item.Count).Wait();
+                await RetryUtils.ExecuteAsync(() => ctx.Client.Inventory.RecycleItem(item.ItemId, item.Count),
+                    "RecycleItem", machine.CancellationToken);
 
                 machine.Fire(new ItemRecycledEvent {Id = item.ItemId, Count = item.Count});
 
-                Thread.Sleep(500);
+                await JitterUtils.HumanLikeDelay(500, 0.4, machine.CancellationToken);
             }
 
-            ctx.Inventory.RefreshCachedInventory().Wait();
+            await ctx.Inventory.RefreshCachedInventory();
         }
     }
 }
