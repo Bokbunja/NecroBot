@@ -42,13 +42,14 @@ Expected: version check → login (`Playing as StubTrainer`) → display best Po
 - `ConsoleLogger` now uses UTF-8 and tolerates redirected stdout.
 - The game API + protos → `Stubs/RocketApi.cs` + `Stubs/PoGoProtos.cs`.
 
-### Remaining (optional) polish
+### Done (polish)
 
-- Windows-style `\\config\\…` / `\\Logs\\…` paths still work on Linux but create
-  backslash-in-name files; switch to `Path.Combine` for clean cross-platform output.
-- Replace the obsolete `WebClient` in `VersionCheckState` with `HttpClient`.
-- Add an xUnit project around the catch/transfer/evolve decision logic (now easy
-  against the stub client).
+- ✅ Windows-style `\\config\\…` / `\\Logs\\…` / `\\Configs\\…` / `\\auth.json`
+  paths replaced with `Path.Combine` for clean cross-platform output.
+- ✅ Obsolete `WebClient` in `VersionCheckState` replaced with a static `HttpClient`
+  (async, 10s timeout).
+- ✅ xUnit project (`PoGo.NecroBot.Tests`, 16 tests) covers the catch / transfer /
+  evolve / recycle decision logic against the stub client.
 
 ---
 

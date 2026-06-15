@@ -1,6 +1,7 @@
 #region using directives
 
 using System;
+using System.IO;
 using PoGo.NecroBot.Logic;
 using PoGo.NecroBot.Logic.Logging;
 using PoGo.NecroBot.Logic.State;
@@ -24,7 +25,7 @@ namespace PoGo.NecroBot.CLI
         {
             Logger.SetLogger(new ConsoleLogger(LogLevel.Info));
 
-            GlobalSettings settings = GlobalSettings.Load("\\config\\config.json");
+            GlobalSettings settings = GlobalSettings.Load(Path.Combine("config", "config.json"));
 
             var machine = new StateMachine();
             var stats = new Statistics();

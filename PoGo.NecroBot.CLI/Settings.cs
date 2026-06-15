@@ -12,6 +12,7 @@ using PokemonGo.RocketAPI.Enums;
 using POGOProtos.Enums;
 using POGOProtos.Inventory.Item;
 using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Serialization;
 
 #endregion
 
@@ -38,7 +39,7 @@ namespace PoGo.NecroBot.CLI
                 var input = File.ReadAllText(FilePath);
 
                 JsonSerializerSettings settings = new JsonSerializerSettings();
-                settings.Converters.Add(new StringEnumConverter { CamelCaseText = true });
+                settings.Converters.Add(new StringEnumConverter(new CamelCaseNamingStrategy()));
 
                 JsonConvert.PopulateObject(input, this, settings);
             }
@@ -50,7 +51,7 @@ namespace PoGo.NecroBot.CLI
 
         public void Save(string path)
         {
-            var output = JsonConvert.SerializeObject(this, Formatting.Indented, new StringEnumConverter { CamelCaseText = true });
+            var output = JsonConvert.SerializeObject(this, Formatting.Indented, new StringEnumConverter(new CamelCaseNamingStrategy()));
 
             string folder = Path.GetDirectoryName(path);
             if (!Directory.Exists(folder))
@@ -76,16 +77,15 @@ namespace PoGo.NecroBot.CLI
 
         private static string GetAuthPath(string path)
         {
-            var fullPath = Directory.GetCurrentDirectory() + path;
+            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), path);
             string folder = Path.GetDirectoryName(fullPath);
-            folder += "\\auth.json";
 
-            return folder;
+            return Path.Combine(folder, "auth.json");
         }
 
         public static GlobalSettings Load(string path)
         {
-            var fullPath = Directory.GetCurrentDirectory() + path;
+            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), path);
 
             GlobalSettings settings = null;
             if (File.Exists(fullPath))
@@ -94,7 +94,7 @@ namespace PoGo.NecroBot.CLI
                 var input = File.ReadAllText(fullPath);
 
                 JsonSerializerSettings jsonSettings = new JsonSerializerSettings();
-                jsonSettings.Converters.Add(new StringEnumConverter { CamelCaseText = true });
+                jsonSettings.Converters.Add(new StringEnumConverter(new CamelCaseNamingStrategy()));
                 jsonSettings.ObjectCreationHandling = ObjectCreationHandling.Replace;
                 jsonSettings.DefaultValueHandling = DefaultValueHandling.Populate;
 
@@ -113,9 +113,9 @@ namespace PoGo.NecroBot.CLI
 
         public void Save(string path)
         {
-            var output = JsonConvert.SerializeObject(this, Formatting.Indented, new StringEnumConverter { CamelCaseText = true });
+            var output = JsonConvert.SerializeObject(this, Formatting.Indented, new StringEnumConverter(new CamelCaseNamingStrategy()));
 
-            var fullPath = Directory.GetCurrentDirectory() + path;
+            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), path);
             string folder = Path.GetDirectoryName(fullPath);
             if (!Directory.Exists(folder))
             {

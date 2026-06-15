@@ -1,7 +1,7 @@
-﻿#region using directives
+#region using directives
 
 using System;
-using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -16,10 +16,11 @@ namespace PoGo.NecroBot.Logic.State
         public static string VersionUri =
             "https://raw.githubusercontent.com/NecronomiconCoding/Pokemon-Go-Bot/master/PokemonGo.RocketAPI/Properties/AssemblyInfo.cs";
 
-        // No awaitable work here; the version check is a quick synchronous HTTP GET.
-        public Task<IState> Execute(Context ctx, StateMachine machine)
+        private static readonly HttpClient Http = new HttpClient {Timeout = TimeSpan.FromSeconds(10)};
+
+        public async Task<IState> Execute(Context ctx, StateMachine machine)
         {
-            if (IsLatest())
+            if (await IsLatest())
             {
                 machine.Fire(new NoticeEvent
                 {
@@ -36,23 +37,20 @@ namespace PoGo.NecroBot.Logic.State
                 });
             }
 
-            return Task.FromResult<IState>(new LoginState());
+            return new LoginState();
         }
 
-        private static string DownloadServerVersion()
+        private static Task<string> DownloadServerVersion()
         {
-            using (var wC = new WebClient())
-            {
-                return wC.DownloadString(VersionUri);
-            }
+            return Http.GetStringAsync(VersionUri);
         }
 
-        public bool IsLatest()
+        public async Task<bool> IsLatest()
         {
             try
             {
                 var regex = new Regex(@"\[assembly\: AssemblyVersion\(""(\d{1,})\.(\d{1,})\.(\d{1,})\.(\d{1,})""\)\]");
-                var match = regex.Match(DownloadServerVersion());
+                var match = regex.Match(await DownloadServerVersion());
 
                 if (!match.Success)
                     return false;

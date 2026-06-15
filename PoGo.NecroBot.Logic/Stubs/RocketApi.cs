@@ -97,8 +97,11 @@ namespace PokemonGo.RocketAPI
 
     public class LoginService
     {
-        // Real client raised this for Google device-code auth; never fired by the stub.
+        // Real client raised this for Google device-code auth; never fired by the stub
+        // (kept to preserve the API shape Program.cs subscribes to).
+#pragma warning disable CS0067
         public event Action<string, string> GoogleDeviceCodeEvent;
+#pragma warning restore CS0067
 
         public Task DoPtcLogin(string username, string password) => Task.CompletedTask;
 
