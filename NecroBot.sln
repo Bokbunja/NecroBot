@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoGo.NecroBot.Logic", "PoGo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoGo.NecroBot.CLI", "PoGo.NecroBot.CLI\PoGo.NecroBot.CLI.csproj", "{929DD2DB-4DA7-4BCA-92D3-2B0F68938C0E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoGo.NecroBot.Tests", "PoGo.NecroBot.Tests\PoGo.NecroBot.Tests.csproj", "{DBD5E3D0-E9C4-449F-8F3C-60FF0069D20E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{929DD2DB-4DA7-4BCA-92D3-2B0F68938C0E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{929DD2DB-4DA7-4BCA-92D3-2B0F68938C0E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{929DD2DB-4DA7-4BCA-92D3-2B0F68938C0E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DBD5E3D0-E9C4-449F-8F3C-60FF0069D20E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DBD5E3D0-E9C4-449F-8F3C-60FF0069D20E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DBD5E3D0-E9C4-449F-8F3C-60FF0069D20E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DBD5E3D0-E9C4-449F-8F3C-60FF0069D20E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
