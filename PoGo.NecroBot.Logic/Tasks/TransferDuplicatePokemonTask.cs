@@ -23,7 +23,7 @@ namespace PoGo.NecroBot.Logic.Tasks
             foreach (var duplicatePokemon in duplicatePokemons)
             {
                 if (duplicatePokemon.Cp >= ctx.LogicSettings.KeepMinCp ||
-                    PokemonInfo.CalculatePokemonPerfection(duplicatePokemon) > ctx.LogicSettings.KeepMinIvPercentage)
+                    PokemonInfo.CalculatePokemonPerfection(duplicatePokemon) >= ctx.LogicSettings.KeepMinIvPercentage)
                 {
                     continue;
                 }
@@ -38,10 +38,15 @@ namespace PoGo.NecroBot.Logic.Tasks
                 if (bestPokemonOfType == null)
                     bestPokemonOfType = duplicatePokemon;
 
-                var setting = pokemonSettings.Single(q => q.PokemonId == duplicatePokemon.PokemonId);
-                var family = pokemonFamilies.Single(q => q.FamilyId == setting.FamilyId);
+                // Look-ups can legitimately miss (e.g. a PokemonId not present in the cached
+                // settings/families); guard against it instead of crashing the whole transfer loop.
+                var setting = pokemonSettings.FirstOrDefault(q => q.PokemonId == duplicatePokemon.PokemonId);
+                var family = setting == null
+                    ? null
+                    : pokemonFamilies.FirstOrDefault(q => q.FamilyId == setting.FamilyId);
 
-                family.Candy++;
+                if (family != null)
+                    family.Candy++;
 
                 machine.Fire(new TransferPokemonEvent
                 {
@@ -50,7 +55,7 @@ namespace PoGo.NecroBot.Logic.Tasks
                     Cp = duplicatePokemon.Cp,
                     BestCp = bestPokemonOfType.Cp,
                     BestPerfection = PokemonInfo.CalculatePokemonPerfection(bestPokemonOfType),
-                    FamilyCandies = family.Candy
+                    FamilyCandies = family?.Candy ?? 0
                 });
             }
         }
