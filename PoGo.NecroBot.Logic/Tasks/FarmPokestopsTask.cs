@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Device.Location;
 using System.Linq;
-using System.Threading;
 using PoGo.NecroBot.Logic.Event;
 using PoGo.NecroBot.Logic.Logging;
 using PoGo.NecroBot.Logic.State;
@@ -32,14 +31,14 @@ namespace PoGo.NecroBot.Logic.Tasks
                     $"You're outside of your defined radius! Walking to start ({distanceFromStart}m away) in 5 seconds. Is your Coords.ini file correct?",
                     LogLevel.Warning);
 
-                Thread.Sleep(5000);
+                JitterUtils.HumanLikeSleep(5000, 0.2, machine.CancellationToken);
 
                 ctx.Navigation.HumanLikeWalking(
                     new GeoCoordinate(ctx.Settings.DefaultLatitude, ctx.Settings.DefaultLongitude),
                     ctx.LogicSettings.WalkingSpeedInKilometerPerHour, null).Wait();
             }
 
-            var pokestopList = GetPokeStops(ctx);
+            var pokestopList = GetPokeStops(ctx, machine);
             var stopsHit = 0;
 
             if (pokestopList.Count <= 0)
@@ -61,7 +60,9 @@ namespace PoGo.NecroBot.Logic.Tasks
 
                 var distance = LocationUtils.CalculateDistanceInMeters(ctx.Client.CurrentLatitude,
                     ctx.Client.CurrentLongitude, pokeStop.Latitude, pokeStop.Longitude);
-                var fortInfo = ctx.Client.Fort.GetFort(pokeStop.Id, pokeStop.Latitude, pokeStop.Longitude).Result;
+                var fortInfo = RetryUtils.Execute(
+                    () => ctx.Client.Fort.GetFort(pokeStop.Id, pokeStop.Latitude, pokeStop.Longitude),
+                    "GetFort", machine.CancellationToken);
 
                 machine.Fire(new FortTargetEvent {Name = fortInfo.Name, Distance = distance});
 
@@ -73,7 +74,9 @@ namespace PoGo.NecroBot.Logic.Tasks
                         return true;
                     }).Wait();
 
-                var fortSearch = ctx.Client.Fort.SearchFort(pokeStop.Id, pokeStop.Latitude, pokeStop.Longitude).Result;
+                var fortSearch = RetryUtils.Execute(
+                    () => ctx.Client.Fort.SearchFort(pokeStop.Id, pokeStop.Latitude, pokeStop.Longitude),
+                    "SearchFort", machine.CancellationToken);
                 if (fortSearch.ExperienceAwarded > 0)
                 {
                     machine.Fire(new FortUsedEvent
@@ -85,7 +88,7 @@ namespace PoGo.NecroBot.Logic.Tasks
                 }
 
 
-                Thread.Sleep(1000);
+                JitterUtils.HumanLikeSleep(1000, 0.3, machine.CancellationToken);
                 if (++stopsHit%5 == 0) //TODO: OR item/pokemon bag is full
                 {
                     stopsHit = 0;
@@ -107,9 +110,10 @@ namespace PoGo.NecroBot.Logic.Tasks
             }
         }
 
-        private static List<FortData> GetPokeStops(Context ctx)
+        private static List<FortData> GetPokeStops(Context ctx, StateMachine machine)
         {
-            var mapObjects = ctx.Client.Map.GetMapObjects().Result;
+            var mapObjects = RetryUtils.Execute(() => ctx.Client.Map.GetMapObjects(), "GetMapObjects",
+                machine.CancellationToken);
 
             // Wasn't sure how to make this pretty. Edit as needed.
             var pokeStops = mapObjects.MapCells.SelectMany(i => i.Forts)

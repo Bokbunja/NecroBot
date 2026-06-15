@@ -1,7 +1,6 @@
 ﻿#region using directives
 
 using System.Linq;
-using System.Threading;
 using PoGo.NecroBot.Logic.Event;
 using PoGo.NecroBot.Logic.Logging;
 using PoGo.NecroBot.Logic.State;
@@ -19,7 +18,7 @@ namespace PoGo.NecroBot.Logic.Tasks
         {
             Logger.Write("Looking for pokemon..", LogLevel.Debug);
 
-            var pokemons = GetNearbyPokemons(ctx);
+            var pokemons = GetNearbyPokemons(ctx, machine);
             foreach (var pokemon in pokemons)
             {
                 if (ctx.LogicSettings.UsePokemonToNotCatchFilter &&
@@ -31,9 +30,11 @@ namespace PoGo.NecroBot.Logic.Tasks
 
                 var distance = LocationUtils.CalculateDistanceInMeters(ctx.Client.CurrentLatitude,
                     ctx.Client.CurrentLongitude, pokemon.Latitude, pokemon.Longitude);
-                Thread.Sleep(distance > 100 ? 15000 : 500);
+                JitterUtils.HumanLikeSleep(distance > 100 ? 15000 : 500, 0.2, machine.CancellationToken);
 
-                var encounter = ctx.Client.Encounter.EncounterPokemon(pokemon.EncounterId, pokemon.SpawnPointId).Result;
+                var encounter = RetryUtils.Execute(
+                    () => ctx.Client.Encounter.EncounterPokemon(pokemon.EncounterId, pokemon.SpawnPointId),
+                    "EncounterPokemon", machine.CancellationToken);
 
                 if (encounter.Status == EncounterResponse.Types.Status.EncounterSuccess)
                 {
@@ -47,14 +48,16 @@ namespace PoGo.NecroBot.Logic.Tasks
                 // If pokemon is not last pokemon in list, create delay between catches, else keep moving.
                 if (!Equals(pokemons.ElementAtOrDefault(pokemons.Count() - 1), pokemon))
                 {
-                    Thread.Sleep(ctx.LogicSettings.DelayBetweenPokemonCatch);
+                    JitterUtils.HumanLikeSleep(ctx.LogicSettings.DelayBetweenPokemonCatch, 0.3,
+                        machine.CancellationToken);
                 }
             }
         }
 
-        private static IOrderedEnumerable<MapPokemon> GetNearbyPokemons(Context ctx)
+        private static IOrderedEnumerable<MapPokemon> GetNearbyPokemons(Context ctx, StateMachine machine)
         {
-            var mapObjects = ctx.Client.Map.GetMapObjects().Result;
+            var mapObjects = RetryUtils.Execute(() => ctx.Client.Map.GetMapObjects(), "GetMapObjects",
+                machine.CancellationToken);
 
             var pokemons = mapObjects.MapCells.SelectMany(i => i.CatchablePokemons)
                 .OrderBy(

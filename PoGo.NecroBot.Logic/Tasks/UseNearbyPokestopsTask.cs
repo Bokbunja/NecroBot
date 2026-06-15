@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using PoGo.NecroBot.Logic.Event;
 using PoGo.NecroBot.Logic.State;
 using PoGo.NecroBot.Logic.Utils;
@@ -18,7 +17,7 @@ namespace PoGo.NecroBot.Logic.Tasks
         //so do not make it more than 40 because it will never get close to those stops.
         public static void Execute(Context ctx, StateMachine machine)
         {
-            var pokestopList = GetPokeStops(ctx);
+            var pokestopList = GetPokeStops(ctx, machine);
 
             while (pokestopList.Any())
             {
@@ -30,10 +29,12 @@ namespace PoGo.NecroBot.Logic.Tasks
                 var pokeStop = pokestopList[0];
                 pokestopList.RemoveAt(0);
 
-                ctx.Client.Fort.GetFort(pokeStop.Id, pokeStop.Latitude, pokeStop.Longitude).Wait();
+                RetryUtils.Execute(() => ctx.Client.Fort.GetFort(pokeStop.Id, pokeStop.Latitude, pokeStop.Longitude),
+                    "GetFort", machine.CancellationToken);
 
-                var fortSearch =
-                    ctx.Client.Fort.SearchFort(pokeStop.Id, pokeStop.Latitude, pokeStop.Longitude).Result;
+                var fortSearch = RetryUtils.Execute(
+                    () => ctx.Client.Fort.SearchFort(pokeStop.Id, pokeStop.Latitude, pokeStop.Longitude),
+                    "SearchFort", machine.CancellationToken);
 
                 if (fortSearch.ExperienceAwarded > 0)
                 {
@@ -45,7 +46,7 @@ namespace PoGo.NecroBot.Logic.Tasks
                     });
                 }
 
-                Thread.Sleep(1000);
+                JitterUtils.HumanLikeSleep(1000, 0.3, machine.CancellationToken);
 
                 RecycleItemsTask.Execute(ctx, machine);
 
@@ -57,9 +58,10 @@ namespace PoGo.NecroBot.Logic.Tasks
         }
 
 
-        private static List<FortData> GetPokeStops(Context ctx)
+        private static List<FortData> GetPokeStops(Context ctx, StateMachine machine)
         {
-            var mapObjects = ctx.Client.Map.GetMapObjects().Result;
+            var mapObjects = RetryUtils.Execute(() => ctx.Client.Map.GetMapObjects(), "GetMapObjects",
+                machine.CancellationToken);
 
             // Wasn't sure how to make this pretty. Edit as needed.
             var pokeStops = mapObjects.MapCells.SelectMany(i => i.Forts)

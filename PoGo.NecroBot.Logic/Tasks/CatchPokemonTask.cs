@@ -2,8 +2,6 @@
 
 using System;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using PoGo.NecroBot.Logic.Event;
 using PoGo.NecroBot.Logic.PoGoUtils;
 using PoGo.NecroBot.Logic.State;
@@ -50,8 +48,9 @@ namespace PoGo.NecroBot.Logic.Tasks
                 var distance = LocationUtils.CalculateDistanceInMeters(ctx.Client.CurrentLatitude,
                     ctx.Client.CurrentLongitude, pokemon.Latitude, pokemon.Longitude);
 
-                caughtPokemonResponse =
-                    ctx.Client.Encounter.CatchPokemon(pokemon.EncounterId, pokemon.SpawnPointId, pokeball).Result;
+                caughtPokemonResponse = RetryUtils.Execute(
+                    () => ctx.Client.Encounter.CatchPokemon(pokemon.EncounterId, pokemon.SpawnPointId, pokeball),
+                    "CatchPokemon", machine.CancellationToken);
 
                 var evt = new PokemonCaptureEvent {Status = caughtPokemonResponse.Status};
 
@@ -105,9 +104,10 @@ namespace PoGo.NecroBot.Logic.Tasks
                     machine.Fire(evt);
                 }
                 attemptCounter++;
-                Thread.Sleep(2000);
-            } while (caughtPokemonResponse.Status == CatchPokemonResponse.Types.CatchStatus.CatchMissed ||
-                     caughtPokemonResponse.Status == CatchPokemonResponse.Types.CatchStatus.CatchEscape);
+                JitterUtils.HumanLikeSleep(2000, 0.3, machine.CancellationToken);
+            } while (!machine.CancellationToken.IsCancellationRequested &&
+                     (caughtPokemonResponse.Status == CatchPokemonResponse.Types.CatchStatus.CatchMissed ||
+                      caughtPokemonResponse.Status == CatchPokemonResponse.Types.CatchStatus.CatchEscape));
         }
 
         private static ItemId GetBestBall(Context ctx, EncounterResponse encounter)
@@ -158,11 +158,13 @@ namespace PoGo.NecroBot.Logic.Tasks
             if (berry == null || berry.Count <= 0)
                 return;
 
-            ctx.Client.Encounter.UseCaptureItem(encounterId, ItemId.ItemRazzBerry, spawnPointId).Wait();
+            RetryUtils.Execute(
+                () => ctx.Client.Encounter.UseCaptureItem(encounterId, ItemId.ItemRazzBerry, spawnPointId),
+                "UseRazzBerry", machine.CancellationToken);
             berry.Count -= 1;
             machine.Fire(new UseBerryEvent {Count = berry.Count});
 
-            Thread.Sleep(1500);
+            JitterUtils.HumanLikeSleep(1500, 0.3, machine.CancellationToken);
         }
     }
 }

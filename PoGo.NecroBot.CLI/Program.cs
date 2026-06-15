@@ -62,9 +62,24 @@ namespace PoGo.NecroBot.CLI
             var context = new Context(new ClientSettings(settings), new LogicSettings(settings));
             context.Client.Login.GoogleDeviceCodeEvent += LoginWithGoogle;
 
-            machine.AsyncStart(new VersionCheckState(), context);
+            var botTask = machine.AsyncStart(new VersionCheckState(), context);
 
-            Console.ReadLine();
+            // Graceful shutdown: Ctrl+C (or Ctrl+Break) asks the state machine to stop after its
+            // current step instead of hard-killing the process in the middle of an API call.
+            var shutdownRequested = false;
+            Console.CancelKeyPress += (sender, e) =>
+            {
+                if (shutdownRequested)
+                    return; // second Ctrl+C: let the default handler kill the process
+                shutdownRequested = true;
+                e.Cancel = true; // keep the process alive so we can shut down cleanly
+                Logger.Write("Shutdown requested - stopping bot gracefully (press Ctrl+C again to force quit)...",
+                    LogLevel.Warning);
+                machine.Stop();
+            };
+
+            // Block until the bot loop exits (either via graceful shutdown or completion).
+            botTask.Wait();
         }
     }
 }
