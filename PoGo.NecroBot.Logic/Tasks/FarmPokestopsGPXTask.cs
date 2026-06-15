@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using PoGo.NecroBot.Logic.Event;
 using PoGo.NecroBot.Logic.State;
 using PoGo.NecroBot.Logic.Utils;
@@ -17,7 +18,7 @@ namespace PoGo.NecroBot.Logic.Tasks
 {
     public static class FarmPokestopsGpxTask
     {
-        public static void Execute(Context ctx, StateMachine machine)
+        public static async Task Execute(Context ctx, StateMachine machine)
         {
             var tracks = GetGpxTracks(ctx);
             var curTrkPt = 0;
@@ -49,7 +50,7 @@ namespace PoGo.NecroBot.Logic.Tasks
                             });
                             break;
                         }
-                        var pokestopList = GetPokeStops(ctx, machine);
+                        var pokestopList = await GetPokeStops(ctx, machine);
 
                         while (pokestopList.Any())
                         {
@@ -61,11 +62,11 @@ namespace PoGo.NecroBot.Logic.Tasks
                             var pokeStop = pokestopList[0];
                             pokestopList.RemoveAt(0);
 
-                            RetryUtils.Execute(
+                            await RetryUtils.ExecuteAsync(
                                 () => ctx.Client.Fort.GetFort(pokeStop.Id, pokeStop.Latitude, pokeStop.Longitude),
                                 "GetFort", machine.CancellationToken);
 
-                            var fortSearch = RetryUtils.Execute(
+                            var fortSearch = await RetryUtils.ExecuteAsync(
                                 () => ctx.Client.Fort.SearchFort(pokeStop.Id, pokeStop.Latitude, pokeStop.Longitude),
                                 "SearchFort", machine.CancellationToken);
 
@@ -80,33 +81,30 @@ namespace PoGo.NecroBot.Logic.Tasks
                             }
                             if (fortSearch.ItemsAwarded.Count > 0)
                             {
-                                var refreshCachedInventory = ctx.Inventory.RefreshCachedInventory();
+                                await ctx.Inventory.RefreshCachedInventory();
                             }
 
-                            JitterUtils.HumanLikeSleep(1000, 0.3, machine.CancellationToken);
+                            await JitterUtils.HumanLikeDelay(1000, 0.3, machine.CancellationToken);
 
-                            RecycleItemsTask.Execute(ctx, machine);
+                            await RecycleItemsTask.Execute(ctx, machine);
 
                             if (ctx.LogicSettings.EvolveAllPokemonWithEnoughCandy || ctx.LogicSettings.EvolveAllPokemonAboveIv)
                             {
-                                EvolvePokemonTask.Execute(ctx, machine);
+                                await EvolvePokemonTask.Execute(ctx, machine);
                             }
 
                             if (ctx.LogicSettings.TransferDuplicatePokemon)
                             {
-                                TransferDuplicatePokemonTask.Execute(ctx, machine);
+                                await TransferDuplicatePokemonTask.Execute(ctx, machine);
                             }
                         }
 
-                        ctx.Navigation.HumanPathWalking(trackPoints.ElementAt(curTrkPt),
-                            ctx.LogicSettings.WalkingSpeedInKilometerPerHour, () =>
+                        await ctx.Navigation.HumanPathWalking(trackPoints.ElementAt(curTrkPt),
+                            ctx.LogicSettings.WalkingSpeedInKilometerPerHour, async () =>
                             {
-
-                                CatchNearbyPokemonsTask.Execute(ctx, machine);
-                                UseNearbyPokestopsTask.Execute(ctx, machine);
-                                return true;
-                            }
-                            ).Wait();
+                                await CatchNearbyPokemonsTask.Execute(ctx, machine);
+                                await UseNearbyPokestopsTask.Execute(ctx, machine);
+                            });
 
                         if (curTrkPt >= maxTrkPt)
                             curTrkPt = 0;
@@ -135,9 +133,9 @@ namespace PoGo.NecroBot.Logic.Tasks
         //to only find stops within 40 meters
         //this is for gpx pathing, we are not going to the pokestops,
         //so do not make it more than 40 because it will never get close to those stops.
-        private static List<FortData> GetPokeStops(Context ctx, StateMachine machine)
+        private static async Task<List<FortData>> GetPokeStops(Context ctx, StateMachine machine)
         {
-            var mapObjects = RetryUtils.Execute(() => ctx.Client.Map.GetMapObjects(), "GetMapObjects",
+            var mapObjects = await RetryUtils.ExecuteAsync(() => ctx.Client.Map.GetMapObjects(), "GetMapObjects",
                 machine.CancellationToken);
 
             // Wasn't sure how to make this pretty. Edit as needed.

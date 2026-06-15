@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Device.Location;
 using System.Linq;
+using System.Threading.Tasks;
 using PoGo.NecroBot.Logic.Event;
 using PoGo.NecroBot.Logic.Logging;
 using PoGo.NecroBot.Logic.State;
@@ -17,7 +18,7 @@ namespace PoGo.NecroBot.Logic.Tasks
 {
     public static class FarmPokestopsTask
     {
-        public static void Execute(Context ctx, StateMachine machine)
+        public static async Task Execute(Context ctx, StateMachine machine)
         {
             var distanceFromStart = LocationUtils.CalculateDistanceInMeters(
                 ctx.Settings.DefaultLatitude, ctx.Settings.DefaultLongitude,
@@ -31,14 +32,14 @@ namespace PoGo.NecroBot.Logic.Tasks
                     $"You're outside of your defined radius! Walking to start ({distanceFromStart}m away) in 5 seconds. Is your Coords.ini file correct?",
                     LogLevel.Warning);
 
-                JitterUtils.HumanLikeSleep(5000, 0.2, machine.CancellationToken);
+                await JitterUtils.HumanLikeDelay(5000, 0.2, machine.CancellationToken);
 
-                ctx.Navigation.HumanLikeWalking(
+                await ctx.Navigation.HumanLikeWalking(
                     new GeoCoordinate(ctx.Settings.DefaultLatitude, ctx.Settings.DefaultLongitude),
-                    ctx.LogicSettings.WalkingSpeedInKilometerPerHour, null).Wait();
+                    ctx.LogicSettings.WalkingSpeedInKilometerPerHour, null);
             }
 
-            var pokestopList = GetPokeStops(ctx, machine);
+            var pokestopList = await GetPokeStops(ctx, machine);
             var stopsHit = 0;
 
             if (pokestopList.Count <= 0)
@@ -60,21 +61,17 @@ namespace PoGo.NecroBot.Logic.Tasks
 
                 var distance = LocationUtils.CalculateDistanceInMeters(ctx.Client.CurrentLatitude,
                     ctx.Client.CurrentLongitude, pokeStop.Latitude, pokeStop.Longitude);
-                var fortInfo = RetryUtils.Execute(
+                var fortInfo = await RetryUtils.ExecuteAsync(
                     () => ctx.Client.Fort.GetFort(pokeStop.Id, pokeStop.Latitude, pokeStop.Longitude),
                     "GetFort", machine.CancellationToken);
 
                 machine.Fire(new FortTargetEvent {Name = fortInfo.Name, Distance = distance});
 
-                ctx.Navigation.HumanLikeWalking(new GeoCoordinate(pokeStop.Latitude, pokeStop.Longitude),
+                await ctx.Navigation.HumanLikeWalking(new GeoCoordinate(pokeStop.Latitude, pokeStop.Longitude),
                     ctx.LogicSettings.WalkingSpeedInKilometerPerHour,
-                    () =>
-                    {
-                        CatchNearbyPokemonsTask.Execute(ctx, machine);
-                        return true;
-                    }).Wait();
+                    async () => { await CatchNearbyPokemonsTask.Execute(ctx, machine); });
 
-                var fortSearch = RetryUtils.Execute(
+                var fortSearch = await RetryUtils.ExecuteAsync(
                     () => ctx.Client.Fort.SearchFort(pokeStop.Id, pokeStop.Latitude, pokeStop.Longitude),
                     "SearchFort", machine.CancellationToken);
                 if (fortSearch.ExperienceAwarded > 0)
@@ -88,31 +85,31 @@ namespace PoGo.NecroBot.Logic.Tasks
                 }
 
 
-                JitterUtils.HumanLikeSleep(1000, 0.3, machine.CancellationToken);
+                await JitterUtils.HumanLikeDelay(1000, 0.3, machine.CancellationToken);
                 if (++stopsHit%5 == 0) //TODO: OR item/pokemon bag is full
                 {
                     stopsHit = 0;
                     if (fortSearch.ItemsAwarded.Count > 0)
                     {
-                        var refreshCachedInventory = ctx.Inventory.RefreshCachedInventory();
+                        await ctx.Inventory.RefreshCachedInventory();
                     }
-                    RenamePokemonTask.Execute(ctx, machine);
-                    RecycleItemsTask.Execute(ctx, machine);
+                    await RenamePokemonTask.Execute(ctx, machine);
+                    await RecycleItemsTask.Execute(ctx, machine);
                     if (ctx.LogicSettings.EvolveAllPokemonWithEnoughCandy || ctx.LogicSettings.EvolveAllPokemonAboveIv)
                     {
-                        EvolvePokemonTask.Execute(ctx, machine);
+                        await EvolvePokemonTask.Execute(ctx, machine);
                     }
                     if (ctx.LogicSettings.TransferDuplicatePokemon)
                     {
-                        TransferDuplicatePokemonTask.Execute(ctx, machine);
+                        await TransferDuplicatePokemonTask.Execute(ctx, machine);
                     }
                 }
             }
         }
 
-        private static List<FortData> GetPokeStops(Context ctx, StateMachine machine)
+        private static async Task<List<FortData>> GetPokeStops(Context ctx, StateMachine machine)
         {
-            var mapObjects = RetryUtils.Execute(() => ctx.Client.Map.GetMapObjects(), "GetMapObjects",
+            var mapObjects = await RetryUtils.ExecuteAsync(() => ctx.Client.Map.GetMapObjects(), "GetMapObjects",
                 machine.CancellationToken);
 
             // Wasn't sure how to make this pretty. Edit as needed.

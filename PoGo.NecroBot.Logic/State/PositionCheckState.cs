@@ -2,6 +2,7 @@
 
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using PoGo.NecroBot.Logic.Event;
 using PoGo.NecroBot.Logic.Utils;
 
@@ -11,7 +12,8 @@ namespace PoGo.NecroBot.Logic.State
 {
     public class PositionCheckState : IState
     {
-        public IState Execute(Context ctx, StateMachine machine)
+        // Purely local file/coordinate checks; nothing to await.
+        public Task<IState> Execute(Context ctx, StateMachine machine)
         {
             var coordsPath = Directory.GetCurrentDirectory() + "\\Configs\\Coords.ini";
             if (File.Exists(coordsPath))
@@ -58,7 +60,7 @@ namespace PoGo.NecroBot.Logic.State
 
             machine.RequestDelay(3000);
 
-            return new FarmState();
+            return Task.FromResult<IState>(new FarmState());
         }
 
         private static Tuple<double, double> LoadPositionFromDisk(StateMachine machine)

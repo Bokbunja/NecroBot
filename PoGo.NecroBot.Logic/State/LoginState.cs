@@ -1,5 +1,6 @@
-﻿#region using directives
+#region using directives
 
+using System.Threading.Tasks;
 using PoGo.NecroBot.Logic.Event;
 using PokemonGo.RocketAPI.Enums;
 using PokemonGo.RocketAPI.Exceptions;
@@ -10,24 +11,18 @@ namespace PoGo.NecroBot.Logic.State
 {
     public class LoginState : IState
     {
-        public IState Execute(Context ctx, StateMachine machine)
+        public async Task<IState> Execute(Context ctx, StateMachine machine)
         {
             try
             {
                 switch (ctx.Settings.AuthType)
                 {
                     case AuthType.Ptc:
-                        try
-                        {
-                            ctx.Client.Login.DoPtcLogin(ctx.Settings.PtcUsername, ctx.Settings.PtcPassword).Wait();
-                        }
-                        catch (System.AggregateException ae)
-                        {
-                            throw ae.Flatten().InnerException;
-                        }
+                        // await unwraps the AggregateException, so PtcOfflineException surfaces directly.
+                        await ctx.Client.Login.DoPtcLogin(ctx.Settings.PtcUsername, ctx.Settings.PtcPassword);
                         break;
                     case AuthType.Google:
-                        ctx.Client.Login.DoGoogleLogin().Wait();
+                        await ctx.Client.Login.DoGoogleLogin();
                         break;
                     default:
                         machine.Fire(new ErrorEvent {Message = "wrong AuthType"});
@@ -50,14 +45,14 @@ namespace PoGo.NecroBot.Logic.State
                 return null;
             }
 
-            DownloadProfile(ctx, machine);
+            await DownloadProfile(ctx, machine);
 
             return new InfoState();
         }
 
-        public void DownloadProfile(Context ctx, StateMachine machine)
+        public async Task DownloadProfile(Context ctx, StateMachine machine)
         {
-            ctx.Profile = ctx.Client.Player.GetPlayer().Result;
+            ctx.Profile = await ctx.Client.Player.GetPlayer();
             machine.Fire(new ProfileEvent {Profile = ctx.Profile});
         }
     }

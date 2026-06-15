@@ -1,6 +1,7 @@
-﻿#region using directives
+#region using directives
 
 using System.Linq;
+using System.Threading.Tasks;
 using PoGo.NecroBot.Logic.Event;
 using PoGo.NecroBot.Logic.Logging;
 using PoGo.NecroBot.Logic.State;
@@ -14,11 +15,11 @@ namespace PoGo.NecroBot.Logic.Tasks
 {
     public static class CatchNearbyPokemonsTask
     {
-        public static void Execute(Context ctx, StateMachine machine)
+        public static async Task Execute(Context ctx, StateMachine machine)
         {
             Logger.Write("Looking for pokemon..", LogLevel.Debug);
 
-            var pokemons = GetNearbyPokemons(ctx, machine);
+            var pokemons = await GetNearbyPokemons(ctx, machine);
             foreach (var pokemon in pokemons)
             {
                 if (ctx.LogicSettings.UsePokemonToNotCatchFilter &&
@@ -30,15 +31,15 @@ namespace PoGo.NecroBot.Logic.Tasks
 
                 var distance = LocationUtils.CalculateDistanceInMeters(ctx.Client.CurrentLatitude,
                     ctx.Client.CurrentLongitude, pokemon.Latitude, pokemon.Longitude);
-                JitterUtils.HumanLikeSleep(distance > 100 ? 15000 : 500, 0.2, machine.CancellationToken);
+                await JitterUtils.HumanLikeDelay(distance > 100 ? 15000 : 500, 0.2, machine.CancellationToken);
 
-                var encounter = RetryUtils.Execute(
+                var encounter = await RetryUtils.ExecuteAsync(
                     () => ctx.Client.Encounter.EncounterPokemon(pokemon.EncounterId, pokemon.SpawnPointId),
                     "EncounterPokemon", machine.CancellationToken);
 
                 if (encounter.Status == EncounterResponse.Types.Status.EncounterSuccess)
                 {
-                    CatchPokemonTask.Execute(ctx, machine, encounter, pokemon);
+                    await CatchPokemonTask.Execute(ctx, machine, encounter, pokemon);
                 }
                 else
                 {
@@ -48,15 +49,15 @@ namespace PoGo.NecroBot.Logic.Tasks
                 // If pokemon is not last pokemon in list, create delay between catches, else keep moving.
                 if (!Equals(pokemons.ElementAtOrDefault(pokemons.Count() - 1), pokemon))
                 {
-                    JitterUtils.HumanLikeSleep(ctx.LogicSettings.DelayBetweenPokemonCatch, 0.3,
+                    await JitterUtils.HumanLikeDelay(ctx.LogicSettings.DelayBetweenPokemonCatch, 0.3,
                         machine.CancellationToken);
                 }
             }
         }
 
-        private static IOrderedEnumerable<MapPokemon> GetNearbyPokemons(Context ctx, StateMachine machine)
+        private static async Task<IOrderedEnumerable<MapPokemon>> GetNearbyPokemons(Context ctx, StateMachine machine)
         {
-            var mapObjects = RetryUtils.Execute(() => ctx.Client.Map.GetMapObjects(), "GetMapObjects",
+            var mapObjects = await RetryUtils.ExecuteAsync(() => ctx.Client.Map.GetMapObjects(), "GetMapObjects",
                 machine.CancellationToken);
 
             var pokemons = mapObjects.MapCells.SelectMany(i => i.CatchablePokemons)

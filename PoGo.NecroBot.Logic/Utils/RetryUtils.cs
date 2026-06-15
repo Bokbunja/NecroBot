@@ -24,11 +24,10 @@ namespace PoGo.NecroBot.Logic.Utils
         private static readonly Random Jitter = new Random();
 
         /// <summary>
-        ///     Run an asynchronous, value-returning API call synchronously, retrying transient
-        ///     failures with exponential backoff. Mirrors the existing <c>.Result</c> style used
-        ///     throughout the bot, but resilient to flaky networks.
+        ///     Await an asynchronous, value-returning API call, retrying transient failures with
+        ///     exponential backoff.
         /// </summary>
-        public static T Execute<T>(Func<Task<T>> action, string operationName,
+        public static async Task<T> ExecuteAsync<T>(Func<Task<T>> action, string operationName,
             CancellationToken cancellationToken = default(CancellationToken),
             int maxRetries = DefaultMaxRetries, int baseDelayMs = DefaultBaseDelayMs)
         {
@@ -38,21 +37,20 @@ namespace PoGo.NecroBot.Logic.Utils
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    return action().Result;
+                    return await action().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
-                    if (!HandleFailure(ex, ref attempt, operationName, maxRetries, baseDelayMs, cancellationToken))
-                        throw;
+                    attempt = await HandleFailureAsync(ex, attempt, operationName, maxRetries, baseDelayMs,
+                        cancellationToken).ConfigureAwait(false);
                 }
             }
         }
 
         /// <summary>
-        ///     Run an asynchronous, void API call synchronously, retrying transient failures with
-        ///     exponential backoff. Replacement for the existing <c>.Wait()</c> call sites.
+        ///     Await an asynchronous, void API call, retrying transient failures with exponential backoff.
         /// </summary>
-        public static void Execute(Func<Task> action, string operationName,
+        public static async Task ExecuteAsync(Func<Task> action, string operationName,
             CancellationToken cancellationToken = default(CancellationToken),
             int maxRetries = DefaultMaxRetries, int baseDelayMs = DefaultBaseDelayMs)
         {
@@ -62,26 +60,25 @@ namespace PoGo.NecroBot.Logic.Utils
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    action().Wait();
+                    await action().ConfigureAwait(false);
                     return;
                 }
                 catch (Exception ex)
                 {
-                    if (!HandleFailure(ex, ref attempt, operationName, maxRetries, baseDelayMs, cancellationToken))
-                        throw;
+                    attempt = await HandleFailureAsync(ex, attempt, operationName, maxRetries, baseDelayMs,
+                        cancellationToken).ConfigureAwait(false);
                 }
             }
         }
 
         /// <summary>
-        ///     Decides whether another attempt should be made. Returns false (caller rethrows) when
-        ///     the retry budget is exhausted or the failure is one we must not swallow. Otherwise it
-        ///     sleeps for the backoff interval and returns true.
+        ///     Either waits for the backoff interval and returns the incremented attempt count, or
+        ///     rethrows when the retry budget is exhausted / the failure must not be swallowed.
         /// </summary>
-        private static bool HandleFailure(Exception ex, ref int attempt, string operationName,
+        private static async Task<int> HandleFailureAsync(Exception ex, int attempt, string operationName,
             int maxRetries, int baseDelayMs, CancellationToken cancellationToken)
         {
-            // .Result/.Wait() wrap the real exception in an AggregateException.
+            // await unwraps most exceptions, but defensively flatten anything that arrives aggregated.
             var inner = (ex as AggregateException)?.Flatten().InnerException ?? ex;
 
             // Cancellation is never a transient failure - propagate it so shutdown is immediate.
@@ -92,7 +89,7 @@ namespace PoGo.NecroBot.Logic.Utils
             if (attempt > maxRetries)
             {
                 Logger.Write($"{operationName} failed after {maxRetries} retries: {inner.Message}", LogLevel.Error);
-                return false;
+                throw inner;
             }
 
             var backoff = Math.Min((int) (baseDelayMs * Math.Pow(2, attempt - 1)), MaxBackoffMs);
@@ -103,11 +100,8 @@ namespace PoGo.NecroBot.Logic.Utils
                 $"{operationName} failed (attempt {attempt}/{maxRetries}): {inner.Message}. Retrying in {backoff} ms...",
                 LogLevel.Warning);
 
-            // Cancellation-aware sleep: returns early (true) if shutdown was requested while waiting.
-            if (cancellationToken.WaitHandle.WaitOne(backoff))
-                cancellationToken.ThrowIfCancellationRequested();
-
-            return true;
+            await Task.Delay(backoff, cancellationToken).ConfigureAwait(false);
+            return attempt;
         }
     }
 }

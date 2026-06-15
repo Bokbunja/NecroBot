@@ -29,7 +29,7 @@ namespace PoGo.NecroBot.Logic.State
 
         public Task AsyncStart(IState initialState, Context ctx)
         {
-            return Task.Run(() => Start(initialState, ctx));
+            return Task.Run(async () => await Start(initialState, ctx));
         }
 
         public event StateMachineEventDeletate EventListener;
@@ -58,7 +58,7 @@ namespace PoGo.NecroBot.Logic.State
             _cancellationSource.Cancel();
         }
 
-        public void Start(IState initialState, Context ctx)
+        public async Task Start(IState initialState, Context ctx)
         {
             _ctx = ctx;
             var state = initialState;
@@ -72,10 +72,10 @@ namespace PoGo.NecroBot.Logic.State
 
                 try
                 {
-                    state = state.Execute(ctx, this);
+                    state = await state.Execute(ctx, this);
                     consecutiveFailures = 0;
 
-                    if (WaitOrCancelled(_delay, token))
+                    if (await WaitOrCancelled(_delay, token))
                         break;
                     _delay = 0;
                 }
@@ -86,7 +86,7 @@ namespace PoGo.NecroBot.Logic.State
                 catch (Exception ex)
                 {
                     // A cancellation may surface wrapped in an AggregateException (e.g. from a
-                    // .Wait() inside a walking callback). Treat that as a clean shutdown.
+                    // walking callback). Treat that as a clean shutdown.
                     if (token.IsCancellationRequested)
                         break;
 
@@ -101,7 +101,7 @@ namespace PoGo.NecroBot.Logic.State
                         Message = $"Recovering from error (failure #{consecutiveFailures}). Retrying in {backoff / 1000}s..."
                     });
 
-                    if (WaitOrCancelled(backoff, token))
+                    if (await WaitOrCancelled(backoff, token))
                         break;
 
                     state = _initialState;
@@ -112,14 +112,22 @@ namespace PoGo.NecroBot.Logic.State
         }
 
         /// <summary>
-        ///     Blocks for <paramref name="milliseconds" /> unless cancellation is requested first.
+        ///     Awaits for <paramref name="milliseconds" /> unless cancellation is requested first.
         ///     Returns true if a shutdown was requested (caller should stop looping).
         /// </summary>
-        private static bool WaitOrCancelled(int milliseconds, CancellationToken token)
+        private static async Task<bool> WaitOrCancelled(int milliseconds, CancellationToken token)
         {
             if (milliseconds <= 0)
                 return token.IsCancellationRequested;
-            return token.WaitHandle.WaitOne(milliseconds);
+            try
+            {
+                await Task.Delay(milliseconds, token);
+                return false;
+            }
+            catch (OperationCanceledException)
+            {
+                return true;
+            }
         }
     }
 }
